@@ -1,4 +1,6 @@
-from mfe_model import MoehlisFaisstEckhardtModelControl, rk4_timestepping
+from mfe_model import rk4_timestepping_control
+from thequickmath.reduced_models.transition_to_turbulence import MoehlisFaisstEckhardtModel
+# from thequickmath.reduced_models.models import rk4_timestepping
 
 from deeptime.clustering import KMeans
 import deeptime.markov as markov
@@ -65,10 +67,10 @@ def random_initial_conditions(m_size):
     ic[-1] = np.random.uniform(-0.05, 0)
     return ic
 
-def generate_trajectory(model, time_step, n_steps): 
+def generate_trajectory(model, time_step, n_steps, action=np.zeros(9)):
     start_time = time.time()
     ic = random_initial_conditions(model.dim)
-    trajectory = rk4_timestepping(model, ic, time_step, n_steps, time_skip=1000, debug=False)
+    trajectory = rk4_timestepping_control(model, ic, action, time_step, n_steps, time_skip=1000, debug=False)
     print("%s seconds" % (time.time() - start_time))
     return trajectory[:-1]
 
@@ -103,7 +105,7 @@ def show_flow(trajectory, y, l):
                 field_y0[i][z][x] = model.three_dim_flow_field(trajectory[points[i]], d_x[x], y, d_z[z])
     return field_y0
 
-def show_energy(trajectory, label):
+def show_energy(model, trajectory, label):
     ek = model.kinetic_energy(trajectory)
     if label:
         plt.plot(np.arange(len(ek)), ek, linewidth=0.7, color = label, markersize = 0.5)
@@ -161,7 +163,7 @@ def show_energy_clust(model, clustering, assignments, label):
             tr_cl[i] = tr_cl[i - 1]
         else:
             tr_cl[i] = clustering.cluster_centers[assignments[i]]
-    show_energy(tr_cl, label)
+    show_energy(model, tr_cl, label)
 
 # def show_inertia(clust1, clust2):
 #     plt.figure(figsize = (5,3))
@@ -337,12 +339,12 @@ def show_distribution_ek(n, model, trajectory, msm, tr_assignments, clustering, 
 def show_ek(tr, discr):
     plt.figure(figsize=(10, 3))
     if tr and discr:
-        show_energy_clust(discr[0], discr[1], discr[2], discr[3])
-        show_energy(tr[0], tr[1])
+        show_energy_clust(*discr)
+        show_energy(*tr)
     elif tr:
-        show_energy(tr[0], tr[1])
+        show_energy(*tr)
     else:
-        show_energy_clust(discr[0], discr[1], discr[2], discr[3])
+        show_energy_clust(*discr)
     plt.grid()
     plt.show()
 
@@ -367,7 +369,7 @@ if __name__ == "__main__":
     time_step = 0.001
     n_steps = 15000000
 
-    model = MoehlisFaisstEckhardtModelControl(Re, Lx, Lz)
+    model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
 
     # Получение временных рядов Т=15000
 

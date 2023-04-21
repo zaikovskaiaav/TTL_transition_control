@@ -8,11 +8,10 @@ import matplotlib.pyplot as plt
 
 
 # Вычисление правой части системы по известной траектории
-def get_B(model, trajectory):
-    model.reset_action()
+def get_B(model, trajectory, action=np.zeros(9)):
     da = np.zeros_like(trajectory)
     for i in range(len(trajectory)):
-        da[i] = model.f(trajectory[i])
+        da[i] = model.f(trajectory[i], action)
     return da
 
 # Вывод графика изменения значений правых частей системы для траектории
@@ -80,22 +79,26 @@ def get_action(control_dim, control_range):
 # Генератор траекторий с постоянным управляющим воздействием
 def const_control(model, actions):
     for i in range(len(actions)):
-        model.set_action(actions[i])
-        test = generate_trajectory(model, time_step, n_steps)
+        test = generate_trajectory(model, time_step, n_steps, actions[i])
         np.savetxt(f'time_series/ad_test{i}.txt', test)
 
-def get_action_space(a_range, n):
-    action_space = np.zeros((len(a_range), n))
-    for i in range(len(a_range)):
+def get_action_space(a_range, n, num_of_a = 9):
+    action_space = np.zeros((num_of_a, n))
+    for i in range(num_of_a):
         action_space[i][0] = 0
         action_space[i][1:] = np.linspace(a_range[i][0], a_range[i][1], n-1)
+
     #
     # comb_array = np.array(np.meshgrid(action_space[0], action_space[1], action_space[2], action_space[3],
     #                                   action_space[4], action_space[5], action_space[6], action_space[7],
     #                                   action_space[8])).T.reshape(-1, len(a_range))
-    comb_array = np.array(np.meshgrid(*action_space)).T.reshape(-1, len(a_range))
+    comb_array = np.array(np.meshgrid(*action_space)).T.reshape(-1, num_of_a)
+    actions = np.empty((len(comb_array), len(a_range)))
+    if num_of_a != len(a_range):
+        for i in range(len(comb_array)):
+            actions[i] = np.append(comb_array[i], np.zeros(len(a_range)-num_of_a), axis=0)
 
-    return action_space, comb_array
+    return action_space, actions
 
 
 if __name__ == "__main__":
@@ -109,7 +112,7 @@ if __name__ == "__main__":
     time_step = 0.001
     n_steps = 15000000
 
-    # Нахождения значений правых частей системы B и их распределений для готовой траектории
+    # Нахождение значений правых частей системы B и их распределений для готовой траектории
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
 
     da = get_B(m, trajectory)
@@ -126,13 +129,12 @@ if __name__ == "__main__":
     # for i in range(len(actions)):
     #     for j in range(len(a[i])):
     #         actions[i][j] = a[i][j]
-    #
+
     # const_control(m, actions)
-    #
+
     # # Вывод распределений правых частей для траекторий с константным управлением
     # for i in range(len(actions)):
     #     trajectory = np.loadtxt(f'time_series/ad_test{i}.txt')
-    #     m.reset_action()
-    #     da = get_B(m, trajectory)
+    #     da = get_B(m, trajectory, actions[i])
     #     show_B(da)
     #     show_B_distribution(da)

@@ -1,44 +1,53 @@
 import random
+import time
 import numpy as np
-from s_discretization import random_initial_conditions, states_clustering, get_laminar_states
+from s_discretization import random_initial_conditions, states_clustering, get_laminar_states, show_ek
 from a_discretization import get_action_space, get_action_limits, get_B
 from mfe_model import MoehlisFaisstEckhardtModelControl, rk4_timestepping_control
 
 
 class Environment:
-    def __init__(self, action_space, m, cl, lam):
+    def __init__(self, action_space, m, clust_model):
         self.action_space = action_space
+        self.state_space_model = clust_model
         self.n_a = len(action_space)
-        # self.state_space = state_space
-        self.states_clusters = cl
-        self.n_s = len(cl.cluster_centers)
-        self.lam_states = lam
+        self.n_s = len(clust_model.cluster_centers)
 
         self.model = m
         self.cur_state = np.zeros(self.model.dim)
 
+        self.eps = 1e-5
+        self.time = 0
+        self.T = 7000
+
     def reset(self):
+        self.time = 0
         self.cur_state = random_initial_conditions(self.model.dim)
-        print('ic:', self.cur_state)
-        self.model.reset_action()
-        return self.states_clusters.transform(np.array([self.cur_state]))
+        # print('ic:', self.cur_state)
+        return self.state_space_model.transform(np.array([self.cur_state]))
 
-    def get_reward(self, state):
-        return -sum((state - self.lam_states)**2)
+    def get_reward(self):
+        # print(state)
+        return -sum((self.cur_state - self.model.laminar_state)**2)
 
-    #
-    # def get_discrete_state(self):
-    #     new_state = self.states_clusters.transform(self.cur_state)
-    #     return new_state
+    def lam_stop_condition(self, reward):
+        return -self.eps <= reward <= self.eps
 
-    def step(self, action, n_steps=1000):
-        self.model.set_action(self.action_space[action])
-        self.cur_state = rk4_timestepping_control(self.model, self.cur_state, delta_t=0.001, n_steps=n_steps)[-2]
-        print(self.cur_state)
-        next_state = self.states_clusters.transform(np.array([self.cur_state]))
-        reward = self.get_reward(next_state)
-        if reward == 0:
+    def time_stop_condition(self):
+        return self.time == self.T
+
+    def step(self, action_num, n_steps=1000):
+        self.time += 1
+        if (self.time % 100) == 0:
+            print("t = ", self.time)
+        self.cur_state = rk4_timestepping_control(self.model, self.cur_state, self.action_space[action_num],
+                                                  delta_t=0.001, n_steps=n_steps)[-2]
+        next_state = self.state_space_model.transform(np.array([self.cur_state]))
+        reward = self.get_reward()
+        if self.time_stop_condition():
             return next_state, reward, True
+        # elif self.lam_stop_condition(reward):
+        #     return next_state, reward, True
         return next_state, reward, False
 
 
@@ -52,27 +61,25 @@ if __name__ == "__main__":
 
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
     clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=1000)
-    lam_states = get_laminar_states(clust_u, assign_u, model)
 
-    a_vec, actions = get_action_space(get_action_limits(get_B(model, trajectory)), 5)
+    a_vec, actions = get_action_space(get_action_limits(get_B(model, trajectory)), 5, num_of_a=4)
 
-    env = Environment(actions, model, clust_u, lam_states[0])
+    env = Environment(actions, model, clust_u)
 
+    alpha = 0.8
+    gamma = 0.9
+    epsilon = 0.2
 
-    # Hyperparameters
-    alpha = 0.1
-    gamma = 0.6
-    epsilon = 0.1
+    # q_table = np.zeros([env.n_s, env.n_a])
+    q_table = np.loadtxt('q_table.gz')
 
-    all_epochs = []
-    all_penalties = []
-
-    q_table = np.zeros([env.n_s, env.n_a])
-
-    for i in range(1, 101):
+    start_time = time.time()
+    for i in range(5):
+        print("Iteration ", i)
         state = env.reset()
-        epochs, penalties, reward, = 0, 0, 0
+        reward = 0
         done = False
+        states_traj = np.array([state])
 
         while not done:
             if random.uniform(0, 1) < epsilon:
@@ -80,23 +87,20 @@ if __name__ == "__main__":
             else:
                 action = np.argmax(q_table[state])
 
-            next_state, reward, done = env.step(action, 5000)
-            print(i, reward)
+            next_state, reward, done = env.step(action, 1000)
 
-            old_value = q_table[state, action]
-            next_max = np.max(q_table[next_state])
-
-            new_value = (1 - alpha) * old_value + alpha * (reward + gamma * next_max)
+            new_value = (1 - alpha) * q_table[state, action] + alpha * (reward + gamma * np.max(q_table[next_state]))
             q_table[state, action] = new_value
 
-            # if reward == -10:
-            #     penalties += 1
 
             state = next_state
-            epochs += 1
+            states_traj = np.append(states_traj, state)
 
-        if i % 100 == 0:
-            # clear_output(wait=True)
-            print(f"Episode: {i}")
+        np.savetxt(f'time_series/ep_trajectories_{i}.txt', states_traj, fmt='%1u')
+        show_ek(None, [model, clust_u, states_traj, None])
+        np.savetxt(f'q_table.gz', q_table)
 
     print("Training finished.\n")
+    print(f"{(time.time() - start_time)//60} min, {(time.time() - start_time)%60} sec")
+    np.savetxt(f'q_table.gz', q_table)
+
