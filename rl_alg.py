@@ -1,3 +1,4 @@
+import os.path
 import random
 import time
 import numpy as np
@@ -18,7 +19,7 @@ class Environment:
 
         self.eps = 1e-5
         self.time = 0
-        self.T = 7000
+        self.T = 3000
 
     def reset(self):
         self.time = 0
@@ -46,35 +47,16 @@ class Environment:
         reward = self.get_reward()
         if self.time_stop_condition():
             return next_state, reward, True
-        # elif self.lam_stop_condition(reward):
-        #     return next_state, reward, True
+        elif self.lam_stop_condition(reward):
+            return next_state, reward, True
         return next_state, reward, False
 
 
-
-if __name__ == "__main__":
-
-    Re = 500.0
-    Lx = 1.75 * np.pi
-    Lz = 1.2 * np.pi
-    model = MoehlisFaisstEckhardtModelControl(Re, Lx, Lz)
-
-    trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
-    clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=1000)
-
-    a_vec, actions = get_action_space(get_action_limits(get_B(model, trajectory)), 5, num_of_a=4)
-
-    env = Environment(actions, model, clust_u)
-
-    alpha = 0.8
-    gamma = 0.9
-    epsilon = 0.2
-
-    # q_table = np.zeros([env.n_s, env.n_a])
-    q_table = np.loadtxt('q_table.gz')
+def q_learning(env, filename, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9, n_steps_rk=1000):
+    q_table = np.loadtxt(filename)
 
     start_time = time.time()
-    for i in range(5):
+    for i in range(episodes):
         print("Iteration ", i)
         state = env.reset()
         reward = 0
@@ -87,20 +69,50 @@ if __name__ == "__main__":
             else:
                 action = np.argmax(q_table[state])
 
-            next_state, reward, done = env.step(action, 1000)
+            next_state, reward, done = env.step(action, n_steps_rk)
 
             new_value = (1 - alpha) * q_table[state, action] + alpha * (reward + gamma * np.max(q_table[next_state]))
             q_table[state, action] = new_value
-
 
             state = next_state
             states_traj = np.append(states_traj, state)
 
         np.savetxt(f'time_series/ep_trajectories_{i}.txt', states_traj, fmt='%1u')
         show_ek(None, [model, clust_u, states_traj, None])
-        np.savetxt(f'q_table.gz', q_table)
+        np.savetxt(filename, q_table)
 
     print("Training finished.\n")
-    print(f"{(time.time() - start_time)//60} min, {(time.time() - start_time)%60} sec")
-    np.savetxt(f'q_table.gz', q_table)
+    print(f"{(time.time() - start_time) // 60} min, {(time.time() - start_time) % 60} sec")
+
+
+
+
+if __name__ == "__main__":
+    Re = 500.0
+    Lx = 1.75 * np.pi
+    Lz = 1.2 * np.pi
+    model = MoehlisFaisstEckhardtModelControl(Re, Lx, Lz)
+
+    trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
+    clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=1000)
+
+    a = 10
+    a_comp = 4
+    a_vec, actions = get_action_space(get_action_limits(get_B(model, trajectory)), a, num_of_a=a_comp)
+
+    env = Environment(actions, model, clust_u)
+
+    alpha = 0.8
+    gamma = 0.9
+    epsilon = 0.2
+
+    n_steps_rk = 1000
+
+    n_episodes = 10
+    filename = f'q_tables/q_table_a_{a}_acomp_{a_comp}_rk_{n_steps_rk}.gz'  # + диапазон а
+
+    if not os.path.exists(filename):
+        np.savetxt(filename, np.zeros([env.n_s, env.n_a]))
+
+    q_learning(env, filename, n_episodes, epsilon, alpha, gamma, n_steps_rk)
 
