@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import time
+import sys
 
 
 # class Clustering:
@@ -61,10 +62,12 @@ import time
 
 #Задание начальных условий, получение траектории
 
-def random_initial_conditions(m_size): 
-    ic = np.random.uniform(-0.05, 0.05, size=m_size)
-    ic[0] = np.random.uniform(0, 0.05)
-    ic[-1] = np.random.uniform(-0.05, 0)
+def random_initial_conditions(m_size, seed=None):
+    np.random.seed(seed)
+    limit = 0.2
+    ic = np.random.uniform(-limit, limit, size=m_size)
+    ic[0] = np.random.uniform(0, limit)
+    ic[-1] = np.random.uniform(-limit, 0)
     return ic
 
 def generate_trajectory(model, time_step, n_steps, action=np.zeros(9)):
@@ -105,14 +108,14 @@ def show_flow(trajectory, y, l):
                 field_y0[i][z][x] = model.three_dim_flow_field(trajectory[points[i]], d_x[x], y, d_z[z])
     return field_y0
 
-def show_energy(model, trajectory, label):
+def show_energy(model, trajectory, color, ylab="$E$", k=1):
     ek = model.kinetic_energy(trajectory)
-    if label:
-        plt.plot(np.arange(len(ek)), ek, linewidth=0.7, color = label, markersize = 0.5)
+    if color:
+        plt.plot(np.arange(len(ek))*k, ek, linewidth=0.7, color=color, markersize = 0.5)
     else:
-        plt.plot(np.arange(len(ek)), ek,  linewidth=1, markersize = 0.5)
+        plt.plot(np.arange(len(ek))*k, ek,  linewidth=1, markersize = 0.5)
     plt.xlabel("$t$")
-    plt.ylabel("$E$")
+    plt.ylabel(ylab)
     # return ek
 
 
@@ -156,14 +159,14 @@ def get_energy_clust(clustering, assignments, model):
 #     plt.ylabel("$E$")
 #     # return ek
 
-def show_energy_clust(model, clustering, assignments, label):
+def show_energy_clust(model, clustering, assignments, color, ylab="$E$", k=1):
     tr_cl = np.zeros((len(assignments), model.dim))
     for i in range(len(assignments)):
         if assignments[i] == -1:
             tr_cl[i] = tr_cl[i - 1]
         else:
             tr_cl[i] = clustering.cluster_centers[assignments[i]]
-    show_energy(model, tr_cl, label)
+    show_energy(model, tr_cl, color, ylab, k)
 
 # def show_inertia(clust1, clust2):
 #     plt.figure(figsize = (5,3))
@@ -265,7 +268,7 @@ def show_lifetime_distribution(lam_times):
 
 # Получение кинетической энергии каждого состояния траектории
 def get_ek_trajectory(model, trajectory, tr_assignments):
-    ek_states = np.zeros(1000)
+    ek_states = np.zeros(len(tr_assignments))
     ek_trajectory = model.kinetic_energy(trajectory)
     for i in range(len(tr_assignments)):
         ek_states[tr_assignments[i]] = ek_trajectory[i]
@@ -275,7 +278,7 @@ def get_ek_trajectory(model, trajectory, tr_assignments):
 # Математическое ожидание
 def calc_expectation(p, a):
     ex = 0
-    for i in range(len(a)):
+    for i in range(len(p)):
         ex += p[i] * a[i]
     return ex
 
@@ -360,70 +363,105 @@ def get_laminar_states(cur_clust, cur_assign, model):
                 lam_states_a.append(cur_clust.cluster_centers[cur_assign[t]])
     return lam_states_a
 
+def mape_of_n_cl(n_clust, trajectory, model, tr_test):
+    mape_arr = np.zeros_like(n_clust)
+    for i in range(len(n_clust)):
+        cur_mape = 0
+        for j in range(len(tr_test)):
+            clust, assign = states_clustering('kmeans_uniform', trajectory, n_iter_max=100000, n_cl=n_clust[i])
+            assign_test = clust.transform(tr_test[j])
+            cur_mape += calc_mape(model, tr_test[j], clust, assign_test)
+        mape_arr[i] = cur_mape/len(tr_test)
+    plt.plot(n_clust, mape_arr, 'o--')
+    plt.xlabel('$n$')
+    plt.ylabel('$MAPE$')
+    plt.grid()
+    plt.show()
+
+
 if __name__ == "__main__":
+
+    get_new_time_series = False  # если False, используются сохраненные временные ряды
+    time_step = 0.001   # параметры метода Рунге-Кутты
+    n_steps = 15000000
+
+    do_clustering = True  # выполнить кластеризацию
+    n_clusters = 850
+    do_clustering_analysis = True  # вывести зависимость ошибки кластеризации от числа кластеров
+    do_msm = False  # выполнить эксперимент с марковским процессом
+
+    if not(do_clustering) and do_msm:
+        print("Для построения модели марковского процесса необходимо провести кластеризацию, установите do_clusterng = True")
+        sys.exit()
 
     Re = 500.0
     Lx = 1.75 * np.pi
     Lz = 1.2 * np.pi
 
-    time_step = 0.001
-    n_steps = 15000000
-
     model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
 
     # Получение временных рядов Т=15000
+    if get_new_time_series:
+        trajectory = generate_trajectory(model, time_step, n_steps)
+        np.savetxt('time_series/trajectory_for_clustering.txt', trajectory)
 
-    # trajectory = generate_trajectory(model, time_step, n_steps)
-    # np.savetxt('time_series/trajectory_for_clustering.txt', trajectory)
+        tr_test1 = generate_trajectory(model, time_step, n_steps)
+        np.savetxt('time_series/trajectory_test1.txt', tr_test1)
 
-    # tr_test1 = generate_trajectory(model, time_step, n_steps)
-    # np.savetxt('time_series/trajectory_test1.txt', tr_test1)
-
-    # tr_test2 = generate_trajectory(model, time_step, n_steps)
-    # np.savetxt('time_series/trajectory_test2.txt', tr_test2)
+        tr_test2 = generate_trajectory(model, time_step, n_steps)
+        np.savetxt('time_series/trajectory_test2.txt', tr_test2)
 
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
     tr_test1 = np.loadtxt('time_series/trajectory_test1.txt')
     tr_test2 = np.loadtxt('time_series/trajectory_test2.txt')
 
-
     # Проведение кластеризации
-    clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max = 1000, n_cl = 1000)
-    clust_k, assign_k = states_clustering('kmeans_k++', trajectory, n_iter_max = 1000, n_cl = 1000)
+    if do_clustering:
+        clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max = 1000, n_cl = n_clusters)
+        clust_k, assign_k = states_clustering('kmeans_k++', trajectory, n_iter_max = 1000, n_cl = n_clusters)
 
-    show_ek([trajectory, '#4B0082'], [model, clust_u, assign_u, 'orange'])
-    show_ek([trajectory, '#4B0082'], [model, clust_k, assign_k, 'orange'])
+        show_ek([model, trajectory, '#4B0082'], [model, clust_u, assign_u, 'orange'])
+        show_ek([model, trajectory, '#4B0082'], [model, clust_k, assign_k, 'orange'])
 
+        # Вывод тестовых временных рядов
+        assign_test1 = clust_u.transform(tr_test1)
+        show_ek([model, tr_test1, '#4B0082'], [model, clust_u, assign_test1, 'orange'])
 
-    # Вывод тестовых временных рядов
-    assign_test1 = clust_u.transform(tr_test1)
-    show_ek([tr_test1, '#4B0082'], [model, clust_u, assign_test1, 'orange'])
+        assign_test2 = clust_u.transform(tr_test2)
+        show_ek([model, tr_test2, '#4B0082'], [model, clust_u, assign_test2, 'orange'])
 
-    assign_test2 = clust_u.transform(tr_test2)
-    show_ek([tr_test2, '#4B0082'], [model, clust_u, assign_test2, 'orange'])
-
-
-    # Расчет ошибки кластеризации
-    mape = calc_mape(model, tr_test1, clust_u, assign_test1)
-
-
-    #Нахождение матрицы переходов
-    msm = get_msm(assign_u)
+        # Расчет ошибки кластеризации
+        mape = calc_mape(model, tr_test1, clust_u, assign_test1)
+        print("MAPE:", mape)
 
 
-    # Нахождение распределение времени жизни турбулентности
-    start_time = time.time()
-    lam_times = lifetime_distribution(msm, model, clust_u, 1000, 2000) #1000, 20000
-    print("%s seconds" % (time.time() - start_time))
+    if do_clustering_analysis:
+        tr_test_arr = [tr_test1, tr_test2, trajectory]
 
-    show_lifetime_distribution(lam_times)
+        n_clust = np.array([100, 500, 1000, 2000, 3000, 5000, 8000, 10000])
+        mape_of_n_cl(n_clust, trajectory, model, tr_test_arr)
 
+        n_clust = np.arange(50, 1000, 50)
+        mape_of_n_cl(n_clust, trajectory, model, tr_test_arr)
 
-    # Симуляция марковского процесса
-    ic = random_ic_discr_state(model.dim, clust_u)
-    msm_t = msm.simulate(15000, ic)
-    show_ek(None, [model, clust_u, msm_t, None])
+        n_clust = np.arange(500, 700, 10)
+        mape_of_n_cl(n_clust, trajectory, model, tr_test_arr)
 
+    if do_msm:
+        #Нахождение матрицы переходов
+        msm = get_msm(assign_u)
 
-    # Получение распределения на n шагов
-    show_distribution_ek(300, model, trajectory, msm, assign_u, clust_u, 0)
+        # Нахождение распределение времени жизни турбулентности
+        start_time = time.time()
+        lam_times = lifetime_distribution(msm, model, clust_u, 1000, 2000) #1000, 20000
+        print("%s seconds" % (time.time() - start_time))
+        show_lifetime_distribution(lam_times)
+
+        # Симуляция марковского процесса
+        ic = random_ic_discr_state(model.dim, clust_u)
+        msm_t = msm.simulate(15000, ic)
+        show_ek(None, [model, clust_u, msm_t, None])
+
+        # Получение распределения на n шагов
+        show_distribution_ek(300, model, trajectory, msm, assign_u, clust_u, 0)
+

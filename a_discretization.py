@@ -26,13 +26,15 @@ def show_B(da):
         plt.show()
 
 # Вывод распределений для значений правых частей системы
-def show_B_distribution(da):
+def show_B_distribution(da, perc_range):
+    lower_perc = (100 - perc_range)/2
+    higher_perc = 100 - lower_perc
     da_T = da.T
     a_range = np.zeros((len(da_T), 2))
 
     for i in range(len(da_T)):
-        l_perc = np.percentile(da_T[i], 10)
-        r_perc = np.percentile(da_T[i], 90)
+        l_perc = np.percentile(da_T[i], lower_perc)
+        r_perc = np.percentile(da_T[i], higher_perc)
         a_range[i][0] = l_perc
         a_range[i][1] = r_perc
 
@@ -59,12 +61,14 @@ def show_B_distribution(da):
     return a_range
 
 
-def get_action_limits(da):
+def get_action_limits(da, perc_range):
+    lower_perc = (100 - perc_range) / 2
+    higher_perc = 100 - lower_perc
     da_T = da.T
     a_range = np.zeros((len(da_T), 2))
     for i in range(len(da_T)):
-        l_perc = np.percentile(da_T[i], 10)
-        r_perc = np.percentile(da_T[i], 90)
+        l_perc = np.percentile(da_T[i], lower_perc)
+        r_perc = np.percentile(da_T[i], higher_perc)
         a_range[i][0] = l_perc
         a_range[i][1] = r_perc
     return a_range
@@ -97,7 +101,6 @@ def get_action_space(a_range, n, num_of_a = 9):
     if num_of_a != len(a_range):
         for i in range(len(comb_array)):
             actions[i] = np.append(comb_array[i], np.zeros(len(a_range)-num_of_a), axis=0)
-
     return action_space, actions
 
 
@@ -112,12 +115,14 @@ if __name__ == "__main__":
     time_step = 0.001
     n_steps = 15000000
 
+    perc_range = 90
+
     # Нахождение значений правых частей системы B и их распределений для готовой траектории
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
 
     da = get_B(m, trajectory)
     # show_B(da)
-    a_range = show_B_distribution(da)
+    a_range = show_B_distribution(da, perc_range)
     print(a_range)
 
     action_space = get_action_space(a_range, 5)
