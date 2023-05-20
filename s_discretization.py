@@ -1,6 +1,6 @@
-from mfe_model import rk4_timestepping_control
+# from mfe_model import rk4_timestepping_control
 from thequickmath.reduced_models.transition_to_turbulence import MoehlisFaisstEckhardtModel
-# from thequickmath.reduced_models.models import rk4_timestepping
+from thequickmath.reduced_models.models import rk4_timestepping
 
 from deeptime.clustering import KMeans
 import deeptime.markov as markov
@@ -62,18 +62,19 @@ import sys
 
 #Задание начальных условий, получение траектории
 
-def random_initial_conditions(m_size, seed=None):
+def random_initial_conditions(m_size, seed=None, limit=0.2, is_mfe=True):
     np.random.seed(seed)
-    limit = 0.2
+    # limit = 0.2
     ic = np.random.uniform(-limit, limit, size=m_size)
-    ic[0] = np.random.uniform(0, limit)
-    ic[-1] = np.random.uniform(-limit, 0)
+    if is_mfe:
+        ic[0] = np.random.uniform(0, limit)
+        ic[-1] = np.random.uniform(-limit, 0)
     return ic
 
-def generate_trajectory(model, time_step, n_steps, action=np.zeros(9)):
+def generate_trajectory(model, time_step, n_steps, limit=0.2):
     start_time = time.time()
-    ic = random_initial_conditions(model.dim)
-    trajectory = rk4_timestepping_control(model, ic, action, time_step, n_steps, time_skip=1000, debug=False)
+    ic = random_initial_conditions(model.dim, limit=limit)
+    trajectory = rk4_timestepping(model, ic, time_step, n_steps, time_skip=1000, debug=False)
     print("%s seconds" % (time.time() - start_time))
     return trajectory[:-1]
 
@@ -380,7 +381,6 @@ def mape_of_n_cl(n_clust, trajectory, model, tr_test):
 
 
 if __name__ == "__main__":
-
     get_new_time_series = False  # если False, используются сохраненные временные ряды
     time_step = 0.001   # параметры метода Рунге-Кутты
     n_steps = 15000000
@@ -397,7 +397,6 @@ if __name__ == "__main__":
     Re = 500.0
     Lx = 1.75 * np.pi
     Lz = 1.2 * np.pi
-
     model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
 
     # Получение временных рядов Т=15000
@@ -414,6 +413,7 @@ if __name__ == "__main__":
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
     tr_test1 = np.loadtxt('time_series/trajectory_test1.txt')
     tr_test2 = np.loadtxt('time_series/trajectory_test2.txt')
+
 
     # Проведение кластеризации
     if do_clustering:

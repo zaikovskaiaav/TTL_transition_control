@@ -34,7 +34,7 @@ class Environment:
         self.delta_t = 0.001
         self.eps = 1e-5
         self.time = 0
-        self.T = 5000
+        self.T = 10000
 
     def set_initial_conditions(self, is_random=True, seed=None):
         if is_random:
@@ -93,7 +93,7 @@ def count_delta(q_n, q_o):
     # return max_d
 
 
-def q_learning(env, filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9, n_steps_rk=1000, is_rand=True, seed=None):
+def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9, n_steps_rk=1000, is_rand=True, seed=None, is_mfe=True):
     q_table = np.loadtxt(filename)
 
     start_time = time.time()
@@ -119,20 +119,22 @@ def q_learning(env, filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gam
             state = next_state
             states_traj = np.append(states_traj, state)
         if save_res:
-            np.savetxt(f'time_series/ep_trajectories_{i}.txt', states_traj, fmt='%1u')
+            # np.savetxt(f'time_series/ep_trajectories_{i}.txt', states_traj, fmt='%1u')
             np.savetxt(filename, q_table)
 
         print(count_delta(q_table, q_old))
-        if env.time < env.T:
+
+        if is_mfe:
+            if env.time < env.T:
+                show_ek(None, [model, clust_u, states_traj, None, f'{i}', n_steps_rk*env.delta_t])
             show_ek(None, [model, clust_u, states_traj, None, f'{i}', n_steps_rk*env.delta_t])
-        show_ek(None, [model, clust_u, states_traj, None, f'{i}', n_steps_rk*env.delta_t])
 
     print("Training finished.\n")
     tt = time.time() - start_time
     print(f"{tt // 60} min, {tt % 60} sec")
 
     if save_res:
-        with open(f"simulation_time/time_{n_states}s_{a_comp}comp_{a}a_perc{perc_range}_continuous", "a") as time_file:
+        with open(time_filename, "a") as time_file:
             t_time = str(round(tt/60, 2))
             time_file.write(f"{t_time} {env.T} {episodes}\n")
 
@@ -167,13 +169,14 @@ if __name__ == "__main__":
 
     n_steps_rk = 5000
 
-    n_episodes = 10
+    n_episodes = 5
     save_res = True
     filename = f'q_tables/q_table_a_{a}_acomp_{a_comp}_rk_{n_steps_rk}_s_{n_states}_perc{perc_range}_continuous.gz'  # + диапазон а
+    time_filename = f"simulation_time/time_{n_states}s_{a_comp}comp_{a}a_perc{perc_range}_continuous"
 
     if not os.path.exists(filename):
         np.savetxt(filename, init_q_table(env.n_s, env.n_a, -0.5))
 
     seed = 6
-    q_learning(env, filename, save_res, n_episodes, epsilon, alpha, gamma, n_steps_rk, False, seed)
+    q_learning(env, filename, time_filename, save_res, n_episodes, epsilon, alpha, gamma, n_steps_rk, False, seed)
 

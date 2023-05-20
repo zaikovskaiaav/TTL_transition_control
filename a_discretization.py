@@ -45,7 +45,7 @@ def show_B_distribution(da, perc_range):
         
         plt.figure(figsize=(9,3))
         plt.bar(bins[:-1], count, width = step_val, edgecolor = 'black')
-        plt.hist(np.repeat(np.arange(l_perc, r_perc+step, step), count.max()/10),
+        plt.hist(np.repeat(np.arange(l_perc, r_perc+step, step), count.max()/1),
                  bins = 1, color = 'orange', alpha = 0.3, edgecolor = 'red')
   
         plt.ylim((0, count.max()+300))
@@ -80,10 +80,17 @@ def get_action(control_dim, control_range):
         control[i] = np.random.uniform(control_range[i][0], control_range[i][1])
     return(control)
 
+def generate_trajectory_const(model, time_step, n_steps, action, limit=0.2):
+    start_time = time.time()
+    ic = random_initial_conditions(model.dim, limit=limit)
+    trajectory = rk4_timestepping(model, ic, action, time_step, n_steps, time_skip=1000, debug=False)
+    print("%s seconds" % (time.time() - start_time))
+    return trajectory[:-1]
+
 # Генератор траекторий с постоянным управляющим воздействием
 def const_control(model, actions):
     for i in range(len(actions)):
-        test = generate_trajectory(model, time_step, n_steps, actions[i])
+        test = generate_trajectory_const(model, time_step, n_steps, actions[i])
         np.savetxt(f'time_series/ad_test{i}.txt', test)
 
 def get_action_space(a_range, n, num_of_a = 9):
@@ -96,12 +103,34 @@ def get_action_space(a_range, n, num_of_a = 9):
     # comb_array = np.array(np.meshgrid(action_space[0], action_space[1], action_space[2], action_space[3],
     #                                   action_space[4], action_space[5], action_space[6], action_space[7],
     #                                   action_space[8])).T.reshape(-1, len(a_range))
-    comb_array = np.array(np.meshgrid(*action_space)).T.reshape(-1, num_of_a)
-    actions = np.empty((len(comb_array), len(a_range)))
+
+    # comb_array = np.array(np.meshgrid(*action_space)).T.reshape(-1, num_of_a)
+
+    comb_array = action_space[0]
+    # print(comb_array)
+    for i in range(len(action_space)-1):
+        cur_comb = np.empty((len(comb_array)*len(action_space[i+1]), i+2))
+        for j in range(len(comb_array)):
+            for k in range(len(action_space[i+1])):
+                if i == 0:
+                    cur_comb[j*len(action_space[i+1])+k] = np.append(np.array([comb_array[j]]), np.array([action_space[i+1][k]]), axis=0)
+                else:
+                    cur_comb[j * len(action_space[i+1]) + k] = np.append(comb_array[j], np.array([action_space[i + 1][k]]),
+                                                      axis=0)
+        comb_array = np.copy(cur_comb)
+        # print(comb_array)
+
+    # print(comb_array)
+    # actions = np.empty((len(comb_array), len(a_range)))
+    # print('*')
+    # print(actions)
+    # print('*')
     if num_of_a != len(a_range):
+        actions = np.empty((len(comb_array), len(a_range)))
         for i in range(len(comb_array)):
             actions[i] = np.append(comb_array[i], np.zeros(len(a_range)-num_of_a), axis=0)
-    return action_space, actions
+        return action_space, actions
+    return action_space, comb_array
 
 
 if __name__ == "__main__":
@@ -125,7 +154,7 @@ if __name__ == "__main__":
     a_range = show_B_distribution(da, perc_range)
     print(a_range)
 
-    action_space = get_action_space(a_range, 5)
+    action_space, actions = get_action_space(a_range, 5)
     print(action_space)
 
     # # Реализация константного управления
