@@ -1,6 +1,8 @@
 import os.path
 import random
 import time
+
+import matplotlib.pyplot as plt
 import numpy as np
 from s_discretization import random_initial_conditions, states_clustering, get_energy_clust, show_ek, get_laminar_states
 from a_discretization import get_action_space, get_action_limits, get_B
@@ -20,21 +22,24 @@ def special_ic(cur_clust, cur_assign, model):
     return start_states
 
 class Environment:
-    def __init__(self, action_space, m, clust_model):
+    def __init__(self, action_space, m, clust_model, assignments, n_steps):
         self.action_space = action_space
         self.state_space_model = clust_model
         self.n_a = len(action_space)
         self.n_s = len(clust_model.cluster_centers)
+        self.n_steps = n_steps
 
         self.model = m
         self.cur_state = np.zeros(self.model.dim)
 
-        self.start_states = special_ic(clust_u, assign_u, model)
+        self.start_states = special_ic(clust_model, assignments, model)
 
         self.delta_t = 0.001
         self.eps = 1e-5
         self.time = 0
-        self.T = 10000
+        self.T = 100
+
+        self.real_trajectory = np.zeros((self.T+1, self.model.dim))
 
     def set_initial_conditions(self, is_random=True, seed=None):
         if is_random:
@@ -45,7 +50,10 @@ class Environment:
 
     def reset(self, is_rand=True, seed=None):
         self.time = 0
+        self.real_trajectory = np.zeros((self.T+1, self.model.dim))
         self.cur_state = self.set_initial_conditions(is_rand, seed)
+        self.real_trajectory[0] = self.cur_state
+
         # print('ic:', self.cur_state)
         return self.state_space_model.transform(np.array([self.cur_state]))
 
@@ -54,7 +62,7 @@ class Environment:
         # print("dist: ", norm(self.cur_state - self.model.laminar_state))
         # print("a: ", norm(action))
         # print(-(norm(self.cur_state - self.model.laminar_state) + 0.5*norm(action)))
-        return -10*norm(self.cur_state - self.model.laminar_state) #- 5*norm(action) #- 0.005*self.time # штраф за т?
+        return -norm(self.cur_state - self.model.laminar_state) #- 5*norm(action) #- 0.005*self.time # штраф за т?
 
     def lam_stop_condition(self, reward):
         return -self.eps <= reward <= self.eps
@@ -62,14 +70,16 @@ class Environment:
     def time_stop_condition(self):
         return self.time >= self.T
 
-    def step(self, action_num, n_steps=1000):
-        self.time += n_steps*self.delta_t
+    def step(self, action_num):
+        self.time += self.n_steps*self.delta_t
         if (self.time % 100) == 0:
             print("t = ", self.time)
         self.cur_state = rk4_timestepping_control(self.model, self.cur_state, self.action_space[action_num],
-                                                  delta_t=self.delta_t, n_steps=n_steps)[-2]
+                                                  delta_t=self.delta_t, n_steps=self.n_steps)[-2]
         next_state = self.state_space_model.transform(np.array([self.cur_state]))
         reward = self.get_reward(self.action_space[action_num])
+
+        self.real_trajectory[int(self.time)] = self.cur_state
 
         if self.time_stop_condition():
             return next_state, reward, True
@@ -78,12 +88,30 @@ class Environment:
             return next_state, reward+10, True
         return next_state, reward, False
 
-def count_delta(q_n, q_o):
+    def show_trajectory(self, real=False, discr=None):
+        if real:
+            show_ek([self.model, self.real_trajectory, None, '$E_к$', self.n_steps * self.delta_t], None)
+        if discr is not None:
+            show_ek(None, [self.model, self.state_space_model, discr, None, '$E_к$', self.n_steps * self.delta_t])
+
+    def show_actions(self, actions, a_comp):
+        fig, axs = plt.subplots(a_comp, figsize=(10, a_comp*2))
+        for i in range(a_comp):
+            axs[i].plot(np.arange(len(actions)), [self.action_space[actions[a]][i] for a in range(len(actions))],
+                        'o--', color='black', markersize=3, linewidth=1)
+            axs[i].set(ylabel=f'$g_{i+1}$')
+            axs[i].grid()
+        plt.xlabel('$t$')
+        plt.show()
+
+
+
+def count_delta(q_n, q_o, t):
     av_d = 0.0
     for i in range(len(q_n)):
         for j in range(len(q_n[0])):
             av_d += abs(q_n[i][j] - q_o[i][j])
-    return av_d/(len(q_n)*len(q_n[0]))
+    return av_d/(len(q_n)*len(q_n[0])*t)
     # max_d = 0.0
     # for i in range(len(q_n)):
     #     for j in range(len(q_n[0])):
@@ -93,15 +121,19 @@ def count_delta(q_n, q_o):
     # return max_d
 
 
-def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9, n_steps_rk=1000, is_rand=True, seed=None, is_mfe=True):
+def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9,
+               is_rand=True, seed=None, show_real=False, show_discr=None, a_comp=None):
+    if a_comp is None:
+        a_comp=env.model.dim
     q_table = np.loadtxt(filename)
 
     start_time = time.time()
     for i in range(episodes):
+        actions_arr = []
         print("Iteration ", i)
         q_old = np.copy(q_table)
         state = env.reset(is_rand, seed)
-        reward = 0
+
         done = False
         states_traj = np.array([state])
 
@@ -111,7 +143,9 @@ def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15,
             else:
                 action = np.argmax(q_table[state])
 
-            next_state, reward, done = env.step(action, n_steps_rk)
+            actions_arr.append(action)
+
+            next_state, reward, done = env.step(action)
 
             new_value = (1 - alpha) * q_table[state, action] + alpha * (reward + gamma * np.max(q_table[next_state]))
             q_table[state, action] = new_value
@@ -122,12 +156,17 @@ def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15,
             # np.savetxt(f'time_series/ep_trajectories_{i}.txt', states_traj, fmt='%1u')
             np.savetxt(filename, q_table)
 
-        print(count_delta(q_table, q_old))
+        print(count_delta(q_table, q_old, env.T))
 
-        if is_mfe:
-            if env.time < env.T:
-                show_ek(None, [model, clust_u, states_traj, None, f'{i}', n_steps_rk*env.delta_t])
-            show_ek(None, [model, clust_u, states_traj, None, f'{i}', n_steps_rk*env.delta_t])
+        # if env.time < env.T:
+        #     env.show_trajectory(discr=states_traj)
+        if show_discr:
+            env.show_trajectory(real=show_real, discr=states_traj)
+        else:
+            env.show_trajectory(real=show_real)
+        env.show_actions(actions_arr, a_comp)
+
+
 
     print("Training finished.\n")
     tt = time.time() - start_time
@@ -153,21 +192,21 @@ if __name__ == "__main__":
 
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
 
-    n_states = 300
+    n_states = 800  # >800
     clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_states)
 
-    a = 10
+    a = 5
     a_comp = 4
     perc_range = 80
     a_vec, action_space = get_action_space(get_action_limits(get_B(model, trajectory),perc_range), a, num_of_a=a_comp)
 
-    env = Environment(action_space, model, clust_u)
-
-    alpha = 0.1
+    alpha = 0.5
     gamma = 0.95
-    epsilon = 0.15
+    epsilon = 0.2
 
-    n_steps_rk = 5000
+    n_steps_rk = 1000   # fix 1000
+
+    env = Environment(action_space, model, clust_u, assign_u, n_steps_rk)
 
     n_episodes = 5
     save_res = True
@@ -175,8 +214,8 @@ if __name__ == "__main__":
     time_filename = f"simulation_time/time_{n_states}s_{a_comp}comp_{a}a_perc{perc_range}_continuous"
 
     if not os.path.exists(filename):
-        np.savetxt(filename, init_q_table(env.n_s, env.n_a, -0.5))
+        np.savetxt(filename, init_q_table(env.n_s, env.n_a, -1.0))
 
     seed = 6
-    q_learning(env, filename, time_filename, save_res, n_episodes, epsilon, alpha, gamma, n_steps_rk, False, seed)
-
+    q_learning(env, filename, time_filename, save_res, n_episodes, epsilon, alpha, gamma,
+               is_rand=False, seed=seed, show_real=False, show_discr=True, a_comp=a_comp)

@@ -6,7 +6,7 @@ from thequickmath.reduced_models.models import rk4_timestepping
 # from pygnuplot import gnuplot
 import time
 
-def plot_data_lorenz(trajectory, ax, color=None):
+def coord_lorenz(trajectory):
     x = np.zeros(len(trajectory))
     y = np.zeros(len(trajectory))
     z = np.zeros(len(trajectory))
@@ -14,34 +14,76 @@ def plot_data_lorenz(trajectory, ax, color=None):
         x[i] = trajectory[i][0]
         y[i] = trajectory[i][1]
         z[i] = trajectory[i][2]
+    return x, y, z
+
+def plot_data_lorenz(trajectory, ax, color=None):
+    x, y, z  = coord_lorenz(trajectory)
     if color:
         ax.plot3D(x, y, z, 'o', markersize=0.7, color=color)
     else:
         ax.plot3D(x, y, z, 'o', markersize=0.7)
 
+def plot_data_lorenz_2D(trajectory, axs, labels, color=None, n_fig=3):
+    x, y, z  = coord_lorenz(trajectory)
+    col = 'black'
+    if color:
+        col = color
+    axs[0].plot(np.arange(len(trajectory)), x, color=col, label=labels[0])
+    axs[1].plot(np.arange(len(trajectory)), y, color=col, label=labels[1])
+    axs[2].plot(np.arange(len(trajectory)), z, color=col, label=labels[2])
+    for i in range(n_fig):
+        axs[i].set(ylabel=labels[i])
+        axs[i].grid()
+    plt.xlabel(r'$t$')
 
-def show_lorenz(trajectory, model):
+
+def show_lorenz_2D(trajectory):
+    n_fig = 3
+    fig, axs = plt.subplots(n_fig, figsize=(10, 6))
+    labels = ['$x(t)$', '$y(t)$', '$z(t)$']
+    plot_data_lorenz_2D(trajectory, axs, labels)
+    plt.show()
+
+def show_lorenz_discr_2D(model, clust, assign):
+    n_fig = 3
+    fig, axs = plt.subplots(n_fig, figsize=(10, 6))
+    labels = ['$x(t)$', '$y(t)$', '$z(t)$']
+    tr_cl = np.zeros((len(assign), model.dim))
+    for i in range(len(assign)):
+        tr_cl[i] = clust.cluster_centers[assign[i]]
+    plot_data_lorenz_2D(tr_cl, axs, labels)
+    plt.show()
+
+def show_lorenz_2D_2plots(trajectory, model, clust, assign):
+    n_fig = 3
+    fig, axs = plt.subplots(n_fig, figsize=(10, 7))
+    labels = ['$x(t)$', '$y(t)$', '$z(t)$']
+
+    tr_cl = np.zeros((len(assign), model.dim))
+    for i in range(len(assign)):
+        tr_cl[i] = clust.cluster_centers[assign[i]]
+
+    plot_data_lorenz_2D(trajectory, axs, labels, color='gray')
+    plot_data_lorenz_2D(tr_cl, axs, labels)
+    plt.show()
+
+
+def show_lorenz(trajectory):
     # x = np.linspace(-np.pi, np.pi, 50)
     # y = x
     # z = np.cos(x)
     ax = plt.axes(projection='3d')
-    plot_data_lorenz(trajectory, ax)
     ax.plot3D(0, 0, 0, 'o', markersize=3, color='red')
-    ax.plot3D(np.sqrt(model.beta * (model.Ra - 1)), np.sqrt(model.beta * (model.Ra - 1)), model.Ra - 1, 'o',
-              markersize=3, color='red')
-    ax.plot3D(-np.sqrt(model.beta * (model.Ra - 1)), -np.sqrt(model.beta * (model.Ra - 1)), model.Ra - 1, 'o',
-              markersize=3, color='red')
+    plot_data_lorenz(trajectory, ax)
     plt.show()
 
 def show_lorenz_discr(model, clust, assign):
     ax = plt.axes(projection ='3d')
-    tr_cl = np.zeros((len(assignments), model.dim))
+    tr_cl = np.zeros((len(assign), model.dim))
     for i in range(len(assign)):
         tr_cl[i] = clust.cluster_centers[assign[i]]
     plot_data_lorenz(tr_cl, ax)
     ax.plot3D(0, 0, 0, 'o', markersize=3, color='red')
-    ax.plot3D(np.sqrt(model.beta*(model.Ra-1)), np.sqrt(model.beta*(model.Ra-1)), model.Ra-1, 'o', markersize=3, color='red')
-    ax.plot3D(-np.sqrt(model.beta * (model.Ra - 1)), -np.sqrt(model.beta * (model.Ra - 1)), model.Ra - 1, 'o', markersize=3, color='red')
     plt.show()
 
 def show_lorenz_2plots(trajectory, model, clust, assign):
@@ -53,8 +95,6 @@ def show_lorenz_2plots(trajectory, model, clust, assign):
     plot_data_lorenz(trajectory, ax, color='orange')
     plot_data_lorenz(tr_cl, ax,color='#4B0082')
     ax.plot3D(0, 0, 0, 'o', markersize=3, color='red')
-    ax.plot3D(np.sqrt(model.beta*(model.Ra-1)), np.sqrt(model.beta*(model.Ra-1)), model.Ra-1, 'o', markersize=3, color='red')
-    ax.plot3D(-np.sqrt(model.beta * (model.Ra - 1)), -np.sqrt(model.beta * (model.Ra - 1)), model.Ra - 1, 'o', markersize=3, color='red')
     plt.show()
 
 # def gif_lorenz(filename):
@@ -114,13 +154,14 @@ def mape_of_n_cl_lorenz(n_clust, trajectory, model, tr_test):
 
 
 if __name__ == "__main__":
-    get_new_time_series = False  # если False, используются сохраненные временные ряды
+    get_new_time_series = False # если False, используются сохраненные временные ряды
     time_step = 0.001  # параметры метода Рунге-Кутты
     n_steps = 15000000
+    n_steps_test = 100000
 
     do_clustering = True  # выполнить кластеризацию
     n_clusters = 1000
-    do_clustering_analysis = True  # вывести зависимость ошибки кластеризации от числа кластеров
+    do_clustering_analysis = False  # вывести зависимость ошибки кластеризации от числа кластеров
     do_msm = False  # выполнить эксперимент с марковским процессом
 
     if not (do_clustering) and do_msm:
@@ -132,47 +173,58 @@ if __name__ == "__main__":
 
     # Получение временных рядов Т=15000
     if get_new_time_series:
-        trajectory = generate_trajectory_lorenz(model, time_step, n_steps, limit=10)
+        trajectory = generate_trajectory_lorenz(model, time_step, n_steps, limit=1)
         np.savetxt('time_series/trajectory_for_clustering_lorenz.txt', trajectory)
 
-        tr_test1 = generate_trajectory_lorenz(model, time_step, n_steps, limit=10)
-        np.savetxt('time_series/trajectory_test1_lorenz.txt', tr_test1)
-
-        tr_test2 = generate_trajectory_lorenz(model, time_step, n_steps, limit=10)
-        np.savetxt('time_series/trajectory_test2_lorenz.txt', tr_test2)
+        # tr_test1 = generate_trajectory_lorenz(model, time_step, n_steps_test, limit=1)
+        # np.savetxt('time_series/trajectory_test1_lorenz.txt', tr_test1)
+        #
+        # tr_test2 = generate_trajectory_lorenz(model, time_step, n_steps_test, limit=1)
+        # np.savetxt('time_series/trajectory_test2_lorenz.txt', tr_test2)
+        #
+        # tr_test3 = generate_trajectory_lorenz(model, time_step, n_steps_test, limit=1)
+        # np.savetxt('time_series/trajectory_test3_lorenz.txt', tr_test3)
+        #
+        # tr_test4 = generate_trajectory_lorenz(model, time_step, n_steps_test, limit=1)
+        # np.savetxt('time_series/trajectory_test4_lorenz.txt', tr_test4)
 
     trajectory = np.loadtxt('time_series/trajectory_for_clustering_lorenz.txt')
     tr_test1 = np.loadtxt('time_series/trajectory_test1_lorenz.txt')
     tr_test2 = np.loadtxt('time_series/trajectory_test2_lorenz.txt')
+    tr_test3 = np.loadtxt('time_series/trajectory_test3_lorenz.txt')
+    tr_test4 = np.loadtxt('time_series/trajectory_test4_lorenz.txt')
 
     # gif_lorenz('time_series/trajectory_for_clustering_lorenz.txt')
-    # show_lorenz(trajectory, model)
-    # show_lorenz(tr_test1, model)
-    # show_lorenz(tr_test2, model)
+    show_lorenz(trajectory)
+    show_lorenz_2D(trajectory)
+    show_lorenz_2D(tr_test1)
+    # show_lorenz(tr_test1)
+    show_lorenz_2D(tr_test2)
 
     # Проведение кластеризации
     if do_clustering:
         clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_clusters)
         clust_k, assign_k = states_clustering('kmeans_k++', trajectory, n_iter_max=1000, n_cl=n_clusters)
 
+        show_lorenz_2D_2plots(trajectory, model, clust_u, assign_u)
         show_lorenz_2plots(trajectory, model, clust_u, assign_u)
-        show_lorenz_2plots(trajectory, model, clust_k, assign_k)
+        show_lorenz_2D_2plots(trajectory, model, clust_k, assign_k)
 
         # Вывод тестовых временных рядов
         assign_test1 = clust_u.transform(tr_test1)
-        show_lorenz_2plots(trajectory, model, clust_u, assign_test1)
+        show_lorenz_2D_2plots(tr_test1, model, clust_u, assign_test1)
 
         assign_test2 = clust_u.transform(tr_test2)
-        show_lorenz_2plots(trajectory, model, clust_u, assign_test2)
+        show_lorenz_2D_2plots(tr_test2, model, clust_u, assign_test2)
 
         # Расчет ошибки кластеризации
         mape = calc_mape_lorenz(model, tr_test1, clust_u, assign_test1)
         print("MAPE:", mape)
 
     if do_clustering_analysis:
-        tr_test_arr = [tr_test1, tr_test2, trajectory]
+        tr_test_arr = [tr_test1, tr_test2, tr_test3, tr_test4, trajectory]
 
-        n_clust = np.array([100, 500, 1000, 2000, 3000, 5000, 8000, 10000])
+        n_clust = np.array([100, 500, 1000, 2000, 3000])
         mape_of_n_cl_lorenz(n_clust, trajectory, model, tr_test_arr)
 
         n_clust = np.arange(50, 1000, 50)

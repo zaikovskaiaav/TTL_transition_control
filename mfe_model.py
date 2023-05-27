@@ -220,8 +220,6 @@ def rk4_timestepping_control(model: DynamicalSystem, ic, action, delta_t, n_step
         # if (k % int(n_steps//10) == 0) and debug:
             # print('Step {} out of {}'.format(k, n_steps))
 
-        # if k*delta_t > 1:
-        #     a = np.zeros_like(action)
         k_1 = delta_t*model.f(cur_state, a)
         k_2 = delta_t*model.f(cur_state + k_1/2., a)
         k_3 = delta_t*model.f(cur_state + k_2/2., a)

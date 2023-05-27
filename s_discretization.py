@@ -71,7 +71,7 @@ def random_initial_conditions(m_size, seed=None, limit=0.2, is_mfe=True):
         ic[-1] = np.random.uniform(-limit, 0)
     return ic
 
-def generate_trajectory(model, time_step, n_steps, limit=0.2):
+def generate_trajectory(model, time_step, n_steps, limit=0.5):
     start_time = time.time()
     ic = random_initial_conditions(model.dim, limit=limit)
     trajectory = rk4_timestepping(model, ic, time_step, n_steps, time_skip=1000, debug=False)
@@ -369,7 +369,7 @@ def mape_of_n_cl(n_clust, trajectory, model, tr_test):
     for i in range(len(n_clust)):
         cur_mape = 0
         for j in range(len(tr_test)):
-            clust, assign = states_clustering('kmeans_uniform', trajectory, n_iter_max=100000, n_cl=n_clust[i])
+            clust, assign = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_clust[i])
             assign_test = clust.transform(tr_test[j])
             cur_mape += calc_mape(model, tr_test[j], clust, assign_test)
         mape_arr[i] = cur_mape/len(tr_test)
@@ -385,7 +385,7 @@ if __name__ == "__main__":
     time_step = 0.001   # параметры метода Рунге-Кутты
     n_steps = 15000000
 
-    do_clustering = True  # выполнить кластеризацию
+    do_clustering = False  # выполнить кластеризацию
     n_clusters = 850
     do_clustering_analysis = True  # вывести зависимость ошибки кластеризации от числа кластеров
     do_msm = False  # выполнить эксперимент с марковским процессом
@@ -436,7 +436,18 @@ if __name__ == "__main__":
 
 
     if do_clustering_analysis:
-        tr_test_arr = [tr_test1, tr_test2, trajectory]
+        tr_test3 = np.loadtxt('time_series/trajectory_test3.txt')
+        tr_test4 = np.loadtxt('time_series/trajectory_test4.txt')
+
+        tr_test5 = generate_trajectory(model, time_step, n_steps, limit=1)
+        np.savetxt('time_series/trajectory_test5.txt', tr_test5)
+        tr_test6 = generate_trajectory(model, time_step, n_steps, limit=1)
+        np.savetxt('time_series/trajectory_test6.txt', tr_test6)
+
+        show_ek([model, tr_test5, None], None)
+        show_ek([model, tr_test6, None], None)
+
+        tr_test_arr = [tr_test1, tr_test2, tr_test3, tr_test4, tr_test5, tr_test6, trajectory]
 
         n_clust = np.array([100, 500, 1000, 2000, 3000, 5000, 8000, 10000])
         mape_of_n_cl(n_clust, trajectory, model, tr_test_arr)
