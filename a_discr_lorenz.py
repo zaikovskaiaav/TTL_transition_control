@@ -1,5 +1,6 @@
 from lorenz_model import LorenzModelControl
-from a_discretization import get_B, show_B_distribution, get_action_space
+from a_discretization import get_B, show_B_distribution, get_action_space, show_B
+from s_discr_lorenz import show_lorenz_2D
 import numpy as np
 
 if __name__ == "__main__":
@@ -9,13 +10,16 @@ if __name__ == "__main__":
     time_step = 0.001
     n_steps = 15000000
 
-    perc_range = 80
+    perc_range = 30
 
     # Нахождение значений правых частей системы B и их распределений для готовой траектории
     trajectory = np.loadtxt('time_series/trajectory_for_clustering_lorenz.txt')
 
     da = get_B(m, trajectory)
-    # show_B(da)
+
+    show_B(da[20:100], scaling=True)
+    show_lorenz_2D(trajectory[20:100])
+
     a_range = show_B_distribution(da, perc_range)
     print(a_range)
 

@@ -40,6 +40,7 @@ class Environment:
         self.T = 100
 
         self.real_trajectory = np.zeros((self.T+1, self.model.dim))
+        self.lam = False
 
     def set_initial_conditions(self, is_random=True, seed=None):
         if is_random:
@@ -50,6 +51,7 @@ class Environment:
 
     def reset(self, is_rand=True, seed=None):
         self.time = 0
+        self.lam = False
         self.real_trajectory = np.zeros((self.T+1, self.model.dim))
         self.cur_state = self.set_initial_conditions(is_rand, seed)
         self.real_trajectory[0] = self.cur_state
@@ -71,22 +73,37 @@ class Environment:
         return self.time >= self.T
 
     def step(self, action_num):
-        self.time += self.n_steps*self.delta_t
+        self.time += self.n_steps * self.delta_t
         if (self.time % 100) == 0:
             print("t = ", self.time)
+
+        prev_state = self.cur_state
         self.cur_state = rk4_timestepping_control(self.model, self.cur_state, self.action_space[action_num],
                                                   delta_t=self.delta_t, n_steps=self.n_steps)[-2]
+
         next_state = self.state_space_model.transform(np.array([self.cur_state]))
         reward = self.get_reward(self.action_space[action_num])
 
         self.real_trajectory[int(self.time)] = self.cur_state
+        self.da[int(self.time)] = model.f(self.cur_state, self.action_space[action_num])
 
         if self.time_stop_condition():
             return next_state, reward, True
         elif self.lam_stop_condition(reward):
-            print('Laminar state')
-            return next_state, reward+10, True
+            print(f'Laminar state, t={env.time}')
+            self.lam = True
+            return next_state, reward + 10, False
         return next_state, reward, False
+
+    def show_actions(self, actions, a_comp):
+        fig, axs = plt.subplots(a_comp, figsize=(10, a_comp*2))
+        for i in range(a_comp):
+            axs[i].plot(np.arange(len(actions)), [self.action_space[actions[a]][i] for a in range(len(actions))],
+                        color='black', markersize=3, linewidth=1)
+            axs[i].set(ylabel=f'$a_{i+1}$')
+            axs[i].grid()
+        plt.xlabel('$t$')
+        plt.show()
 
     def show_trajectory(self, real=False, discr=None):
         if real:
@@ -94,15 +111,7 @@ class Environment:
         if discr is not None:
             show_ek(None, [self.model, self.state_space_model, discr, None, '$E_к$', self.n_steps * self.delta_t])
 
-    def show_actions(self, actions, a_comp):
-        fig, axs = plt.subplots(a_comp, figsize=(10, a_comp*2))
-        for i in range(a_comp):
-            axs[i].plot(np.arange(len(actions)), [self.action_space[actions[a]][i] for a in range(len(actions))],
-                        'o--', color='black', markersize=3, linewidth=1)
-            axs[i].set(ylabel=f'$g_{i+1}$')
-            axs[i].grid()
-        plt.xlabel('$t$')
-        plt.show()
+
 
 
 
@@ -122,7 +131,7 @@ def count_delta(q_n, q_o, t):
 
 
 def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15, alpha=0.1, gamma=0.9,
-               is_rand=True, seed=None, show_real=False, show_discr=None, a_comp=None):
+               is_rand=True, seed=None, show_real=False, show_discr=None, a_comp=None, null_action = 0):
     if a_comp is None:
         a_comp=env.model.dim
     q_table = np.loadtxt(filename)
@@ -138,10 +147,17 @@ def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15,
         states_traj = np.array([state])
 
         while not done:
-            if random.uniform(0, 1) < epsilon:
-                action = random.randrange(len(env.action_space))
+            # action = null_action
+            if env.time < 40:
+                action = null_action
             else:
-                action = np.argmax(q_table[state])
+                # if env.lam:
+                #     action = null_action
+                    # print(env.action_space[0])
+                if random.uniform(0, 1) < epsilon:
+                    action = random.randrange(len(env.action_space))
+                else:
+                    action = np.argmax(q_table[state])
 
             actions_arr.append(action)
 
@@ -160,11 +176,13 @@ def q_learning(env, filename, time_filename, save_res, episodes=1, epsilon=0.15,
 
         # if env.time < env.T:
         #     env.show_trajectory(discr=states_traj)
+
         if show_discr:
             env.show_trajectory(real=show_real, discr=states_traj)
         else:
             env.show_trajectory(real=show_real)
-        env.show_actions(actions_arr, a_comp)
+        # env.show_actions(actions_arr, a_comp)
+        env.show_action(actions_arr[int(20/(env.delta_t*env.n_steps)):])
 
 
 
@@ -189,33 +207,37 @@ if __name__ == "__main__":
     Lx = 1.75 * np.pi
     Lz = 1.2 * np.pi
     model = MoehlisFaisstEckhardtModelControl(Re, Lx, Lz)
-
     trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
 
-    n_states = 800  # >800
-    clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_states)
+    n_states = 800  # число кластеров (дискретных состояний) (>800)
+    a = 5  # число действий для одного уравнения
+    a_comp = 4  # число уравнений, для которых применяется воздействие
+    perc_range = 80  # диапазон значений действий %
 
-    a = 5
-    a_comp = 4
-    perc_range = 80
-    a_vec, action_space = get_action_space(get_action_limits(get_B(model, trajectory),perc_range), a, num_of_a=a_comp)
-
+    # Параметры алгоритма
     alpha = 0.5
-    gamma = 0.95
+    gamma = 1
     epsilon = 0.2
+    n_episodes = 5  # Число эпизодов
 
-    n_steps_rk = 1000   # fix 1000
+    init_values = -1.0  # Начальные значения Q таблицы
+    n_steps_rk = 1000  # Число шагов метода Рунге-Кутты (1000)
 
-    env = Environment(action_space, model, clust_u, assign_u, n_steps_rk)
+    is_rand_ic = True  # Случайный выбор начальных состояний
+    seed = 6  # Для случайного выбора начальных состояний
 
-    n_episodes = 5
     save_res = True
+    # Файлы для сохранения результатов
     filename = f'q_tables/q_table_a_{a}_acomp_{a_comp}_rk_{n_steps_rk}_s_{n_states}_perc{perc_range}_continuous.gz'  # + диапазон а
     time_filename = f"simulation_time/time_{n_states}s_{a_comp}comp_{a}a_perc{perc_range}_continuous"
 
-    if not os.path.exists(filename):
-        np.savetxt(filename, init_q_table(env.n_s, env.n_a, -1.0))
+    clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_states)
+    a_vec, action_space = get_action_space(get_action_limits(get_B(model, trajectory),perc_range), a, num_of_a=a_comp)
 
-    seed = 6
+    env = Environment(action_space, model, clust_u, assign_u, n_steps_rk)
+
+    if not os.path.exists(filename):
+        np.savetxt(filename, init_q_table(env.n_s, env.n_a, init_values))
+
     q_learning(env, filename, time_filename, save_res, n_episodes, epsilon, alpha, gamma,
-               is_rand=False, seed=seed, show_real=False, show_discr=True, a_comp=a_comp)
+               is_rand=is_rand_ic, seed=seed, show_real=False, show_discr=True, a_comp=a_comp)

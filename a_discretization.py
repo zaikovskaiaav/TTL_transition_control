@@ -15,15 +15,20 @@ def get_B(model, trajectory, action=np.zeros(9)):
     return da
 
 # Вывод графика изменения значений правых частей системы для траектории
-def show_B(da):
+def show_B(da, scaling=False):
     da_T = da.T
+    p_max = 1
+    fig, axs = plt.subplots(len(da_T), figsize=(10, len(da_T) * 2))
     for i in range(len(da_T)):
-        plt.figure(figsize=(10,3))
-        plt.plot(np.arange(len(da)), da_T[i],  linewidth=1, markersize = 0.5)
-        plt.xlabel("$t$")
-        plt.ylabel(i)
-        plt.grid()
-        plt.show()
+        if scaling:
+            p_max = max(abs(np.min(da_T[i])), np.max(da_T[i]))
+        axs[i].plot(np.arange(len(da)), da_T[i]/p_max, 'o--',
+                    color='black', linewidth=1, markersize=3)
+        axs[i].set(ylabel=f'$p_{i + 1}$')
+        axs[i].grid()
+    plt.xlabel('$t$')
+    plt.show()
+
 
 # Вывод распределений для значений правых частей системы
 def show_B_distribution(da, perc_range):
@@ -32,24 +37,34 @@ def show_B_distribution(da, perc_range):
     da_T = da.T
     a_range = np.zeros((len(da_T), 2))
 
+    labels = ['$x$', '$y$', '$z$']
+
     for i in range(len(da_T)):
         l_perc = np.percentile(da_T[i], lower_perc)
         r_perc = np.percentile(da_T[i], higher_perc)
         a_range[i][0] = l_perc
         a_range[i][1] = r_perc
 
-        step_val = (da_T[i].max() - da_T[i].min())/150
+        step_val = (da_T[i].max() - da_T[i].min())/70
         step = (r_perc - l_perc)/10
     
-        count, bins = np.histogram(da_T[i], 150)
+        count, bins = np.histogram(da_T[i], 70)
         
-        plt.figure(figsize=(9,3))
-        plt.bar(bins[:-1], count, width = step_val, edgecolor = 'black')
+        plt.figure(figsize=(7,4))
+        plt.bar(bins[:-1], count, width = step_val, edgecolor = 'black', color='gray')
         plt.hist(np.repeat(np.arange(l_perc, r_perc+step, step), count.max()/1),
-                 bins = 1, color = 'orange', alpha = 0.3, edgecolor = 'red')
+                     bins = 1, color = 'orange', alpha = 0.3, edgecolor = 'red')
+
+        # plt.hist(np.repeat(np.arange(np.percentile(da_T[i], 25), np.percentile(da_T[i], 75) + step, step), count.max() / 1),
+        #          bins=1, color = '#FFAE42', alpha = 0.3, edgecolor = 'red')
+        # plt.hist(
+        #     np.repeat(np.arange(np.percentile(da_T[i], 35), np.percentile(da_T[i], 65) + step, step), count.max() / 1),
+        #     bins=1, color = 'orange', alpha = 0.3, edgecolor = 'red')
+
   
-        plt.ylim((0, count.max()+300))
-        plt.xlabel(f'a_%d' % i)
+        plt.ylim((0, count.max()+100))
+        plt.xlabel(labels[i])
+        plt.ylabel('$N$')
         plt.grid()
         plt.show()
 
@@ -118,13 +133,7 @@ def get_action_space(a_range, n, num_of_a = 9):
                     cur_comb[j * len(action_space[i+1]) + k] = np.append(comb_array[j], np.array([action_space[i + 1][k]]),
                                                       axis=0)
         comb_array = np.copy(cur_comb)
-        # print(comb_array)
 
-    # print(comb_array)
-    # actions = np.empty((len(comb_array), len(a_range)))
-    # print('*')
-    # print(actions)
-    # print('*')
     if num_of_a != len(a_range):
         actions = np.empty((len(comb_array), len(a_range)))
         for i in range(len(comb_array)):
