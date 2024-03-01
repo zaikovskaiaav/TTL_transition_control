@@ -4,7 +4,7 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from s_discretization import random_initial_conditions, states_clustering, get_energy_clust, show_ek, get_laminar_states
+from s_discretization_MFE import random_initial_conditions, states_clustering, get_energy_clust, show_ek, get_laminar_states
 from a_discretization import get_action_space, get_action_limits, get_B
 from mfe_model import MoehlisFaisstEckhardtModelControl, rk4_timestepping_control
 

@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from thequickmath.reduced_models.lorenz import LorenzModel
-from s_discretization import random_initial_conditions, states_clustering
+from s_discretization_MFE import random_initial_conditions, states_clustering
 from thequickmath.reduced_models.models import rk4_timestepping
-# from pygnuplot import gnuplot
+
 import time
 
 def coord_lorenz(trajectory):
