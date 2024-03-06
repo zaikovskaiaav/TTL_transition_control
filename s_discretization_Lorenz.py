@@ -1,10 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from thequickmath.reduced_models.lorenz import LorenzModel
-from s_discretization_MFE import random_initial_conditions, states_clustering
+from s_discretization_MFE import states_clustering
 from thequickmath.reduced_models.models import rk4_timestepping
 
 import time
+
+#Задание начальных условий, получение траектории
+def random_initial_conditions(m_size, seed=None, limit=0.2):
+    np.random.seed(seed)
+    return np.random.uniform(-limit, limit, size=m_size)
 
 def coord_lorenz(trajectory):
     x = np.zeros(len(trajectory))
@@ -285,8 +290,8 @@ if __name__ == "__main__":
 
     # Проведение кластеризации
     if do_clustering:
-        clust_u, assign_u = states_clustering('kmeans_uniform', trajectory, n_iter_max=1000, n_cl=n_clusters)
-        clust_k, assign_k = states_clustering('kmeans_k++', trajectory, n_iter_max=1000, n_cl=n_clusters)
+        clust_u, assign_u = states_clustering(trajectory, 'kmeans_uniform', n_iter_max=1000, n_cl=n_clusters)
+        clust_k, assign_k = states_clustering(trajectory, 'kmeans_k++', n_iter_max=1000, n_cl=n_clusters)
 
         show_lorenz_2D_2plots(trajectory, model, clust_u, assign_u)
         show_lorenz_2plots(trajectory, model, clust_u, assign_u)
