@@ -233,9 +233,9 @@ if __name__ == "__main__":
         tr_test2 = generate_trajectory(model, time_step, n_steps)
         np.savetxt('time_series/trajectory_test2.txt', tr_test2)
 
-    trajectory = np.loadtxt('time_series/trajectory_for_clustering.txt')
-    tr_test1 = np.loadtxt('time_series/trajectory_test1.txt')
-    tr_test2 = np.loadtxt('time_series/trajectory_test2.txt')
+    trajectory = np.loadtxt('../time_series/trajectory_for_clustering.txt')
+    tr_test1 = np.loadtxt('../time_series/trajectory_test1.txt')
+    tr_test2 = np.loadtxt('../time_series/trajectory_test2.txt')
 
 
     # Проведение кластеризации
@@ -266,10 +266,10 @@ if __name__ == "__main__":
         # tr_test6 = generate_trajectory(model, time_step, n_steps, limit=1)
         # np.savetxt('time_series/trajectory_test6.txt', tr_test6)
 
-        tr_test3 = np.loadtxt('time_series/trajectory_test3.txt')
-        tr_test4 = np.loadtxt('time_series/trajectory_test4.txt')
-        tr_test5 = np.loadtxt('time_series/trajectory_test5.txt')
-        tr_test6 = np.loadtxt('time_series/trajectory_test6.txt')
+        tr_test3 = np.loadtxt('../time_series/trajectory_test3.txt')
+        tr_test4 = np.loadtxt('../time_series/trajectory_test4.txt')
+        tr_test5 = np.loadtxt('../time_series/trajectory_test5.txt')
+        tr_test6 = np.loadtxt('../time_series/trajectory_test6.txt')
 
         show_ek([model, tr_test5, None], None)
         show_ek([model, tr_test6, None], None)
