@@ -41,7 +41,6 @@ def get_laminar_states(cur_clust, cur_assign, model):
                 lam_states_a.append(cur_clust.cluster_centers[cur_assign[t]])
     return lam_states_a
 
-
 '''         Эксперимент с MSM            '''
 
 # Получение кинетической энергии для дискретной траектории
