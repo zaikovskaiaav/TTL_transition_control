@@ -262,11 +262,11 @@ if __name__ == "__main__":
         tr_test4 = generate_trajectory_lorenz(model, time_step, n_steps_test, limit=10)
         np.savetxt('time_series/trajectory_test4_lorenz.txt', tr_test4)
 
-    trajectory = np.loadtxt('../time_series/trajectory_for_clustering_lorenz.txt')
-    tr_test1 = np.loadtxt('../time_series/trajectory_test1_lorenz.txt')
-    tr_test2 = np.loadtxt('../time_series/trajectory_test2_lorenz.txt')
-    tr_test3 = np.loadtxt('../time_series/trajectory_test3_lorenz.txt')
-    tr_test4 = np.loadtxt('../time_series/trajectory_test4_lorenz.txt')
+    trajectory = np.loadtxt('time_series/trajectory_for_clustering_lorenz.txt')
+    tr_test1 = np.loadtxt('time_series/trajectory_test1_lorenz.txt')
+    tr_test2 = np.loadtxt('time_series/trajectory_test2_lorenz.txt')
+    tr_test3 = np.loadtxt('time_series/trajectory_test3_lorenz.txt')
+    tr_test4 = np.loadtxt('time_series/trajectory_test4_lorenz.txt')
 
     # trajectory = np.loadtxt('time_series/random_trajectory_for_clustering_lorenz.txt')
 
