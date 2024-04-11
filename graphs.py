@@ -32,37 +32,42 @@ def show_flow(trajectory, y, l):
     return field_y0
 
 # Вывод графиков кинетической энергии
-def show_energy(model, trajectory, color=None, ylab="$E(t)$", k=1, linestyle='solid'):
+def show_energy(model, trajectory, color=None, ylab="$E(t)$", k=1, line="single"):
     ek = model.kinetic_energy(trajectory)
-    if linestyle == 'solid':
-        if color is None:
-            color = 'black'
-        plt.plot(np.arange(len(ek))*k, ek, linewidth=1.5, color=color, markersize = 0.5)
+    # if color is None:
+        # color = 'black'
+    # color = str(color if color is not None else 'black')
+    # print(color)
+    if line == "main":
+        plt.plot(np.arange(len(ek))*k, ek, linewidth=2.3, color = color if color is not None else 'darkgray',
+                 markersize = 0.5, linestyle='solid')
+    elif line == "second":
+        plt.plot(np.arange(len(ek))*k, ek, linestyle='solid', color = color if color is not None else 'black',
+                 linewidth=0.4, markersize = 0.4)
     else:
-        if color is None:
-            color = 'gray'
-        plt.plot(np.arange(len(ek))*k, ek, linestyle='dotted', color=color, linewidth=1, markersize = 0.5)
+        plt.plot(np.arange(len(ek)) * k, ek, linewidth=1, color = color if color is not None else 'black',
+                 markersize=0.5, linestyle='solid')
     # plt.xlabel("$t$")
     plt.ylabel(ylab)
     # return ek
 
-def show_energy_clust(model, clustering, assignments, color=None, ylab="$E(t)$", k=1, linestyle='solid'):
+def show_energy_clust(model, clustering, assignments, color=None, ylab="$E(t)$", k=1, line='single'):
     tr_cl = np.zeros((len(assignments), model.dim))
     for i in range(len(assignments)):
         if assignments[i] == -1:
             tr_cl[i] = tr_cl[i - 1]
         else:
             tr_cl[i] = clustering.cluster_centers[assignments[i]]
-    show_energy(model, tr_cl, color, ylab, k, linestyle)
+    show_energy(model, tr_cl, color, ylab, k, line)
 
 def show_ek(tr, discr):
     plt.figure(figsize=(10, 3))
     if tr and discr:
-        show_energy(*tr, linestyle='solid')
-        show_energy_clust(*discr, linestyle='dotted')
+        show_energy(*tr, line='main')
+        show_energy_clust(*discr, line='second')
     elif tr:
-        show_energy(*tr, linestyle='solid')
+        show_energy(*tr, line='single')
     else:
-        show_energy_clust(*discr, linestyle='solid')
+        show_energy_clust(*discr, line='single')
     plt.grid()
     plt.show()

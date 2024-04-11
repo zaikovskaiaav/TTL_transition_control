@@ -25,7 +25,7 @@ def generate_trajectory(model, time_step, n_steps, limit=0.5):
     start_time = time.time()
     ic = random_initial_conditions(model.dim, limit=limit)
     trajectory = rk4_timestepping(model, ic, time_step, n_steps, time_skip=1000, debug=False)
-    print("%s seconds" % (time.time() - start_time))
+    print("Trajectory generation: %s seconds" % (time.time() - start_time))
     return trajectory[:-1]
 
 # Получение списка ламинарных состояний
@@ -76,33 +76,23 @@ def msm_simulation(msm, m_size, time, clust):
     return msm.simulate(time, int(random_ic_discr_state_mfe(m_size, clust)[0]))
 
 # Получение функции выживаемости
-def survival_function(data, debug=False):
+def survival_function(data):
     values = sorted([t for t in data if t != None])
-    if debug and len(data) != len(values):
-        print(f'While building survival function, filtered {len(data) - len(values)} "None" points')
     probs = np.array([1 - i/len(values) for i in range(len(values))])
     return values, probs
 
 # Время жизни турбулентности
-def relaminarisation_time(ke, T=1000, debug=False):
-    '''
-    We detect turbulent-to-laminar transition if the kinetic energy is larger than 15 for more than T time units
-    and return relaminarisation time is this event has occured. Otherwise None is returned
-    '''
+def relaminarisation_time(ke, T=1000):
     transition_start = None
     for t in range(len(ke)):
         if transition_start:
             if t - transition_start > T:
-                if debug:
-                    print(f'Found turbulent-to-laminar transition from {transition_start} to {t}')
                 return t
             if ke[t] < 20:
                 transition_start = None
         elif ke[t] > 20:
             transition_start = t
     last_t = len(ke) - 1
-    if debug and transition_start is not None:
-        print(f'Found turbulent-to-laminar transition from {transition_start} to infty ({last_t})')
     return last_t if transition_start is not None else None
 
 # Получение распределения времени жизни
@@ -118,7 +108,7 @@ def lifetime_distribution(msm, model, clust, n, time):
 # Вывод распределения времени жизни турбулентности
 def show_lifetime_distribution(lam_times):
     fig, ax = plt.subplots(1, 1, figsize=(8, 5))
-    sf = survival_function(lam_times, True)
+    sf = survival_function(lam_times)
     lines = ax.semilogy(sf[0], sf[1], 'o--', color='black', linewidth=1.5, markersize=3.5)
     ax.grid()
     ax.set_xlabel(r'$t$')
@@ -152,7 +142,7 @@ def get_distribution_ek(n, model, trajectory, msm, tr_assignments, start):
 
     p = np.zeros((n, len(msm.transition_matrix))) # Массив распределений вероятности
 
-    ek_i = np.zeros((n+1, int(ek_states.max())+1)) # Массив вероятностей, соответствующих уровням кинетической энергии
+    ek_i = np.zeros((n+1, int(np.max(ek_states))+1)) # Массив вероятностей, соответствующих уровням кинетической энергии
     ek_i[0][int(ek_states[tr_assignments[start]])] = p0[tr_assignments[start]]
 
     p[0] = p0
@@ -171,7 +161,7 @@ def show_distribution_ek(n, model, trajectory, msm, tr_assignments, clustering, 
 
     ek_i, expectation, ek_trajectory = get_distribution_ek(n, model, trajectory, msm, tr_assignments, start)
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+    fig, ax = plt.subplots(figsize=(10, 8))
 
     tr_clust = np.zeros((len(tr_assignments), model.dim))
     for i in range(len(tr_assignments)):
@@ -189,25 +179,38 @@ def show_distribution_ek(n, model, trajectory, msm, tr_assignments, clustering, 
     p1 = ax.imshow(np.transpose(ek_i), origin='lower', aspect='auto', cmap='Oranges', alpha=0.9)
     # plt.legend()
 
-    axins = inset_axes(ax,
-                       width="5%",
-                       height="70%",
-                       loc='lower left',
-                       # bbox_to_anchor=(1.05, 0, 1, 1),
-                       bbox_to_anchor=(1, 0, 1, 1),
-                       bbox_transform=ax.transAxes,
-                       )
-    plt.colorbar(p1, ax=ax, cax=axins, label='Вероятность')
+    # axins = inset_axes(ax,
+    #                    width="5%",
+    #                    height="70%",
+    #                    loc='lower left',
+    #                    bbox_to_anchor=(1.05, 0, 1, 1),
+    #                    # bbox_to_anchor=(1, 0, 1, 1),
+    #                    bbox_transform=ax.transAxes,
+    #                    borderpad=0,
+    #                    )
+    # fig.colorbar(p1, cax=axins, label='Вероятность')
+    fig.colorbar(p1, ax=ax, orientation='horizontal', pad=0.1, label='Вероятность', shrink=0.6  )
+    # fig.tight_layout()
+    plt.subplot_tool()
     plt.show()
 
 
 if __name__ == "__main__":
-    get_new_time_series = False  # если False, используются сохраненные временные ряды
-    time_step = 0.001   # Параметры метода Рунге-Кутты
-    n_steps = 15000000
+    # Параметры системы
+    Re = 500.0
+    Lx = 1.75 * np.pi
+    Lz = 1.2 * np.pi
+    model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
+
+    get_new_time_series = False  # Если False, используются сохраненные временные ряды
+    if get_new_time_series:
+        # Параметры метода Рунге-Кутты
+        time_step = 0.001
+        n_steps = 15000000
 
     do_clustering = True  # Выполнить кластеризацию
-    n_clusters = 850
+    if do_clustering:
+        n_clusters = 850
 
     do_clustering_analysis = False # Вывести зависимость ошибки кластеризации от числа кластеров
 
@@ -216,12 +219,6 @@ if __name__ == "__main__":
     if not(do_clustering) and do_msm:
         print("Для построения модели марковского процесса необходимо провести кластеризацию, установите do_clusterng = True")
         sys.exit()
-
-    # Параметры системы
-    Re = 500.0
-    Lx = 1.75 * np.pi
-    Lz = 1.2 * np.pi
-    model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
 
     # Получение временных рядов Т=15000
     if get_new_time_series:
@@ -245,21 +242,18 @@ if __name__ == "__main__":
         clust_k, assign_k = states_clustering(trajectory, 'kmeans_k++', n_iter_max = 1000, n_cl = n_clusters)
 
         # Вывод графиков кинетической энергии для непрерывной и дискретной траектории
-        show_ek([model, trajectory, 'black'], [model, clust_u, assign_u, None])
-        show_ek([model, trajectory, 'black'], [model, clust_k, assign_k, None])
+        show_ek([model, trajectory, None], [model, clust_u, assign_u, None])
+        show_ek([model, trajectory, None], [model, clust_k, assign_k, None])
 
         # Вывод тестовых временных рядов
         assign_test1 = clust_u.transform(tr_test1)
-        show_ek([model, tr_test1, 'black'], [model, clust_u, assign_test1, None])
-        # show_ek([model, tr_test1, '#4B0082'], [model, clust_u, assign_test1, 'orange'])
-
+        show_ek([model, tr_test1, None], [model, clust_u, assign_test1, None])
         assign_test2 = clust_u.transform(tr_test2)
-        show_ek([model, tr_test2, '#4B0082'], [model, clust_u, assign_test2, 'orange'])
+        show_ek([model, tr_test2, None], [model, clust_u, assign_test2, None])
 
         # Расчет ошибки кластеризации
         mape = calc_mape(model, tr_test1, clust_u, assign_test1)
         print("MAPE = ", mape)
-
 
     if do_clustering_analysis:
         # tr_test5 = generate_trajectory(model, time_step, n_steps, limit=1)
@@ -292,10 +286,10 @@ if __name__ == "__main__":
         msm = get_msm(assign_u)
 
         # Нахождение распределение времени жизни турбулентности
-        # start_time = time.time()
-        # lam_times = lifetime_distribution(msm, model, clust_u, 1000, 20000) #1000, 20000
-        # print("%s seconds" % (time.time() - start_time))
-        # show_lifetime_distribution(lam_times)
+        start_time = time.time()
+        lam_times = lifetime_distribution(msm, model, clust_u, 1000, 200) #1000, 20000
+        print("Lifetime distribution: %s seconds" % (time.time() - start_time))
+        show_lifetime_distribution(lam_times)
 
         # Симуляция марковского процесса
         ic = random_ic_discr_state_mfe(model.dim, clust_u)
@@ -303,5 +297,5 @@ if __name__ == "__main__":
         show_ek(None, [model, clust_u, msm_t, 'black'])
 
         # Получение распределения на n шагов
-        show_distribution_ek(300, model, trajectory, msm, assign_u, clust_u, 0)
+        show_distribution_ek(1000, model, trajectory, msm, assign_u, clust_u, 0) # n=15000
 
