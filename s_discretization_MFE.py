@@ -202,19 +202,19 @@ if __name__ == "__main__":
     Lz = 1.2 * np.pi
     model = MoehlisFaisstEckhardtModel(Re, Lx, Lz)
 
-    get_new_time_series = False  # Если False, используются сохраненные временные ряды
+    get_new_time_series = False     # Если False, используются сохраненные временные ряды
     if get_new_time_series:
         # Параметры метода Рунге-Кутты
         time_step = 0.001
         n_steps = 15000000
 
-    do_clustering = True  # Выполнить кластеризацию
+    do_clustering = True            # Выполнить кластеризацию
     if do_clustering:
         n_clusters = 850
 
-    do_clustering_analysis = False # Вывести зависимость ошибки кластеризации от числа кластеров
+    do_clustering_analysis = False  # Вывести зависимость ошибки кластеризации от числа кластеров
 
-    do_msm = True  # Выполнить эксперимент с марковским процессом
+    do_msm = True                   # Выполнить эксперимент с марковским процессом
 
     if not(do_clustering) and do_msm:
         print("Для построения модели марковского процесса необходимо провести кластеризацию, установите do_clusterng = True")
@@ -287,7 +287,7 @@ if __name__ == "__main__":
 
         # Нахождение распределение времени жизни турбулентности
         start_time = time.time()
-        lam_times = lifetime_distribution(msm, model, clust_u, 1000, 200) #1000, 20000
+        lam_times = lifetime_distribution(msm, model, clust_u, 1000, 200)           #1000, 20000
         print("Lifetime distribution: %s seconds" % (time.time() - start_time))
         show_lifetime_distribution(lam_times)
 
@@ -297,5 +297,5 @@ if __name__ == "__main__":
         show_ek(None, [model, clust_u, msm_t, 'black'])
 
         # Получение распределения на n шагов
-        show_distribution_ek(1000, model, trajectory, msm, assign_u, clust_u, 0) # n=15000
+        show_distribution_ek(1000, model, trajectory, msm, assign_u, clust_u, 0)    # n=15000
 

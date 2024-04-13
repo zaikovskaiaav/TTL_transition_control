@@ -5,20 +5,7 @@ import time
 # from thequickmath.reduced_models.models import rk4_timestepping
 from MFE_model import MoehlisFaisstEckhardtModelControl, rk4_timestepping_control
 from s_discretization_MFE import generate_trajectory, random_initial_conditions_mfe
-from actions_discretization import get_B, get_B_distribution, get_action_space, show_B
-
-
-def get_action_limits(da, perc_range):
-    lower_perc = (100 - perc_range) / 2
-    higher_perc = 100 - lower_perc
-    da_T = da.T
-    a_range = np.zeros((len(da_T), 2))
-    for i in range(len(da_T)):
-        l_perc = np.percentile(da_T[i], lower_perc)
-        r_perc = np.percentile(da_T[i], higher_perc)
-        a_range[i][0] = l_perc
-        a_range[i][1] = r_perc
-    return a_range
+from actions_discretization import get_B, get_B_distribution, get_action_space, show_B, get_action_limits
 
 # Генератор случайного управляющего воздействия
 def get_action(control_dim, control_range):

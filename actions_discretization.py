@@ -25,6 +25,18 @@ def show_B(da, scaling=False, ylabel=None, n_dim=9):
     plt.xlabel('$t$')
     plt.show()
 
+# Нахождение интервала возможных действий
+def get_action_limits(da, perc_range):
+    lower_perc = (100 - perc_range) / 2
+    higher_perc = 100 - lower_perc
+    da_T = da.T
+    a_range = np.zeros((len(da_T), 2))
+    for i in range(len(da_T)):
+        l_perc = np.percentile(da_T[i], lower_perc)
+        r_perc = np.percentile(da_T[i], higher_perc)
+        a_range[i][0] = l_perc
+        a_range[i][1] = r_perc
+    return a_range
 
 # Вывод распределений для значений правых частей системы
 def get_B_distribution(da, perc_range, ylabel=None, n_dim=9, show=True):
@@ -73,7 +85,7 @@ def get_B_distribution(da, perc_range, ylabel=None, n_dim=9, show=True):
 
 # Получение пространства действий в соответствии с заданным диапазоном и количеством
 def get_action_space(a_range, n, num_of_a = 9):
-    # Определение возможных действий
+    # Определение возможных действий для каждой компоненты
     action_space = np.zeros((num_of_a, n))
     for i in range(num_of_a):
         action_space[i][0] = 0
@@ -86,9 +98,8 @@ def get_action_space(a_range, n, num_of_a = 9):
 
     # comb_array = np.array(np.meshgrid(*action_space)).T.reshape(-1, num_of_a)
 
-    #
+    # Определение набора действий (комбинаций действий по отдельным компонентам вектора действий)
     comb_array = action_space[0]
-    # print(comb_array)
     for i in range(len(action_space)-1):
         cur_comb = np.empty((len(comb_array)*len(action_space[i+1]), i+2))
         for j in range(len(comb_array)):

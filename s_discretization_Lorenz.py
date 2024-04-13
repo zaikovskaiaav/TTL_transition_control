@@ -74,17 +74,17 @@ def generate_random_tr(tr):
 if __name__ == "__main__":
     model = LorenzModel(10, 28, 8 / 3)
 
-    get_new_time_series = False # Если False, используются сохраненные временные ряды
+    get_new_time_series = False     # Если False, используются сохраненные временные ряды
 
-    time_step = 0.001  # Параметры метода Рунге-Кутты
+    time_step = 0.001               # Параметры метода Рунге-Кутты
     n_steps = 15000
     n_steps_test = 100000
 
-    do_clustering = True # Выполнить кластеризацию
+    do_clustering = True            # Выполнить кластеризацию
     if do_clustering:
         n_clusters = 10
 
-    do_clustering_analysis = True # Вывести зависимость ошибки кластеризации от числа кластеров
+    do_clustering_analysis = True   # Вывести зависимость ошибки кластеризации от числа кластеров
 
     # Получение временных рядов Т=15000
     if get_new_time_series:
